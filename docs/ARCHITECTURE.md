@@ -1,105 +1,150 @@
-# System Architecture & Technical Flow
+# 🏛️ System Architecture & Technical Specifications
 
-## 1. Architectural Philosophy: Decoupled Multi-Tier Architecture
+## 1. Architectural Philosophy: Decoupled Multi-Tier Platform
 
-The **Student Performance Analytics System** follows an industry-standard **Three-Tier Decoupled Architecture**:
+The **AI-Powered Student Performance Analytics Platform** follows an industry-standard **N-Tier Decoupled Architecture**:
 
-1. **Presentation Tier (Frontend)**: Streamlit interactive web dashboard utilizing Plotly for data visualization.
-2. **Application Tier (Backend REST API)**: FastAPI micro-framework executing request validation (Pydantic), business logic, routing, and CORS policy enforcement.
-3. **Data Tier (Persistence)**: SQLite database queried via SQLAlchemy Object-Relational Mapping (ORM) with session pooling.
+1. **Presentation Tier (Frontend)**: Streamlit interactive multi-role web platform utilizing Plotly for dynamic charts and WebSocket-backed session state management.
+2. **API Gateway & Routing Tier (Backend REST API)**: FastAPI framework handling request routing, JWT validation, RBAC enforcement, and CORS policy management.
+3. **Service & Intelligence Tier (Business Logic)**:
+   - `Security Service`: Bcrypt password hashing & JWT token lifecycle management.
+   - `3-Tier Risk Engine`: Multi-factor 4D academic risk evaluation.
+   - `AI Diagnostic Service`: Google Gemini API client with Pydantic validation & deterministic fallback.
+   - `Reporting Service`: In-memory ReportLab PDF compilation and CSV streaming.
+4. **Data Persistence Tier (ORM & Database)**: Relational schema managed by SQLAlchemy ORM supporting both SQLite (development) and PostgreSQL (production).
 
 ```mermaid
 flowchart TD
-    subgraph Client["Presentation Tier (Port 8501)"]
-        UI["Streamlit UI (dashboard.py)"]
-        Plotly["Plotly Interactive Charts"]
-        HttpClient["Python Requests HTTP Client"]
+    subgraph Client["Presentation Layer (Port 8501)"]
+        UI_A["Admin Portal"]
+        UI_T["Teacher Portal"]
+        UI_S["Student Portal"]
+        State["Session State (JWT Bearer Token)"]
     end
 
-    subgraph API["Application Tier (Port 8000)"]
-        FastAPI["FastAPI Application (main.py)"]
-        CORS["CORS Middleware"]
-        Pydantic["Pydantic Schemas (schemas.py)"]
-        RoutesStu["Students Router (routes/students.py)"]
-        RoutesAn["Analytics Router (routes/analytics.py)"]
-        CRUD["Data Access Layer (crud.py)"]
+    subgraph API["FastAPI Gateway & Route Handlers (Port 8000)"]
+        RouterAuth["Auth Router (/api/auth)"]
+        RouterStu["Students Router (/api/students)"]
+        RouterAn["Analytics Router (/api/analytics)"]
+        RouterAI["AI Diagnostics (/api/ai)"]
+        RouterPlan["Study Plans (/api/study-plans)"]
+        RouterRep["Reports (/api/reports)"]
     end
 
-    subgraph Data["Persistence Tier"]
-        SQLA["SQLAlchemy ORM (models.py & database.py)"]
-        SQLite[("SQLite Database: student_analytics.db")]
+    subgraph Services["Application Services"]
+        SvcSec["Security & Token Service"]
+        SvcRisk["3-Tier At-Risk Engine"]
+        SvcAI["Gemini AI & Fallback Service"]
+        SvcRep["ReportLab PDF & CSV Generator"]
     end
 
-    UI --> HttpClient
-    HttpClient -- "HTTP GET / POST / PUT / DELETE" --> FastAPI
-    FastAPI --> CORS
-    CORS --> Pydantic
-    Pydantic --> RoutesStu
-    Pydantic --> RoutesAn
-    RoutesStu --> CRUD
-    RoutesAn --> CRUD
-    CRUD --> SQLA
-    SQLA --> SQLite
+    subgraph Data["Persistence Layer"]
+        ORM["SQLAlchemy ORM (models.py)"]
+        DB[("Relational Database: SQLite / PostgreSQL")]
+    end
+
+    UI_A & UI_T & UI_S --> State
+    State -- "HTTP REST + Bearer JWT" --> API
+    RouterAuth --> SvcSec
+    RouterStu --> SvcSec
+    RouterAn --> SvcRisk
+    RouterAI --> SvcAI
+    RouterPlan --> SvcAI
+    RouterRep --> SvcRep
+    Services --> ORM
+    ORM --> DB
+    SvcAI -.->|JSON API Request| Gemini["Google Gemini API Cloud"]
 ```
 
 ---
 
-## 2. Request & Response Execution Flow
+## 2. Technical Sequence Workflows
 
-When a user performs an action in the frontend (such as adding a student or requesting department analytics), the end-to-end execution flow proceeds through distinct isolation boundaries:
+### Workflow A: Role-Based Authentication & Self-Access Isolation
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Academic Dean / User
+    actor Student as Student User
     participant Streamlit as Streamlit Frontend (:8501)
     participant FastAPI as FastAPI Backend (:8000)
-    participant Pydantic as Pydantic Validation
-    participant CRUD as CRUD Operations
-    participant DB as SQLite Database
+    participant Security as Security Service (Bcrypt/JWT)
+    participant DB as Relational Database
 
-    User->>Streamlit: Submits "Add Student" Form
-    Streamlit->>FastAPI: HTTP POST /api/students/ {json_payload}
-    FastAPI->>Pydantic: Validate types, marks range (0-100), email syntax
-    alt Validation Failure
-        Pydantic-->>FastAPI: Raise 422 Unprocessable Entity
-        FastAPI-->>Streamlit: Return HTTP 422 with field-level error messages
-        Streamlit-->>User: Display validation warning notification
-    else Validation Success
-        Pydantic-->>FastAPI: Clean StudentCreate Schema
-        FastAPI->>CRUD: Check duplicate student_id & email
-        alt Record Exists
-            CRUD-->>FastAPI: Duplicate Detected
-            FastAPI-->>Streamlit: Return HTTP 409 Conflict
-            Streamlit-->>User: Display duplicate record alert
-        else Unique Record
-            FastAPI->>CRUD: create_student(db, student_in)
-            CRUD->>CRUD: compute_metrics(marks) -> total, avg, grade, at-risk
-            CRUD->>DB: INSERT INTO students (...) VALUES (...)
-            DB-->>CRUD: Commit & Return persisted record
-            CRUD-->>FastAPI: SQLAlchemy Student Instance
-            FastAPI-->>Streamlit: Return HTTP 201 Created + StudentResponse JSON
-            Streamlit-->>User: Display Success Toast & Updated Record
-        end
-    end
+    Student->>Streamlit: Enters credentials (username, password)
+    Streamlit->>FastAPI: POST /api/auth/login {username, password}
+    FastAPI->>DB: Query User by username
+    DB-->>FastAPI: Returns User (hashed_password, role="student")
+    FastAPI->>Security: verify_password(plain, hashed)
+    Security-->>FastAPI: Password valid
+    FastAPI->>Security: create_access_token(sub, role, student_id)
+    Security-->>FastAPI: Signed JWT Token
+    FastAPI-->>Streamlit: 200 OK {access_token, role: "student"}
+    Streamlit->>Streamlit: Stores token in st.session_state
+
+    Note over Student,FastAPI: Student requests another student's report card
+    Student->>Streamlit: Requests /api/reports/student/STU_OTHER/pdf
+    Streamlit->>FastAPI: GET /api/reports/student/STU_OTHER/pdf (Bearer Token)
+    FastAPI->>FastAPI: Extract claims: role="student", allowed_id="STU_SELF"
+    FastAPI-->>Streamlit: 403 Forbidden ("Students restricted to own records")
+    Streamlit-->>Student: Displays Access Denied notification
 ```
 
 ---
 
-## 3. Why Frontend Does Not Directly Touch The Database
+### Workflow B: Gemini AI Diagnosis with Resilient Fallback
 
-In many novice student projects, Streamlit connects directly to SQLite (`sqlite3.connect`). In this project, direct database queries from the frontend are strictly prohibited. 
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Teacher / Student
+    participant FastAPI as FastAPI Backend (:8000)
+    participant AISvc as AI Service (ai_service.py)
+    participant Gemini as Google Gemini API Cloud
+    participant Fallback as Pedagogical Fallback Engine
+    participant DB as Relational Database
 
-**Why Decoupling is Crucial (Key IBM Placement Discussion Point):**
-1. **Security**: The database credentials, schema internals, and query logic are encapsulated behind the API gateway. The presentation layer never has direct SQL execution privileges.
-2. **Reusability & Omnichannel Access**: The exact same FastAPI endpoints can power a Streamlit dashboard, a React web client, an iOS/Android mobile application, or a partner university microservice.
-3. **Independent Scalability**: In a production environment, the backend API can be horizontally scaled across multiple container instances (e.g., Kubernetes / Docker) behind a load balancer, while frontend static assets are served independently.
-4. **Single Source of Truth for Business Logic**: Metric calculation rules, grading cutoffs, and at-risk thresholds exist solely in the backend business layer, eliminating duplicate client-side logic.
+    User->>FastAPI: POST /api/ai/analyze/{student_id}
+    FastAPI->>DB: Fetch Student demographics, marks & attendance
+    DB-->>FastAPI: Student profile (Math: 36, DBMS: 45, Avg: 64.8%)
+    FastAPI->>AISvc: generate_and_save_ai_analysis(db, student)
+
+    alt Gemini API Key Available & Online
+        AISvc->>Gemini: POST generateContent (Prompt + JSON Schema)
+        Gemini-->>AISvc: Raw JSON {overall_summary, weak_subjects, study_plan}
+        AISvc->>AISvc: Validate schema via Pydantic AIPerformanceAnalysis
+    else Gemini Offline / Timeout / No Key
+        AISvc->>Fallback: Trigger deterministic pedagogical analysis
+        Fallback->>Fallback: Compute score gaps (75 - score) & syllabus mapping
+        Fallback-->>AISvc: Structured AIPerformanceAnalysis & 5-day study plan
+    end
+
+    AISvc->>DB: INSERT INTO ai_recommendations (summary, weak_subjects, ...)
+    AISvc->>DB: INSERT INTO study_plans & study_plan_items
+    DB-->>AISvc: Plan created with ID
+    AISvc-->>FastAPI: FullAIAnalysisResponse (source: gemini_api | resilient_fallback)
+    FastAPI-->>User: 200 OK with diagnostic summary & weekly task roadmap
+```
 
 ---
 
-## 4. Key Design Patterns Utilized
+### Workflow C: In-Memory PDF Streaming Architecture
 
-- **Dependency Injection**: FastAPI's `Depends(get_db)` manages the database session lifecycle, automatically creating and closing connections per request without global state pollution.
-- **Repository / Data Access Pattern**: All raw SQL/ORM query logic is encapsulated in `app/crud.py`, keeping route handlers lightweight and focused strictly on HTTP protocol concerns.
-- **Data Transfer Object (DTO) Pattern**: Pydantic schemas (`StudentCreate`, `StudentResponse`, `PaginatedStudentResponse`) act as strongly-typed DTOs that decouple internal database representations from external network responses.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / Faculty
+    participant FastAPI as FastAPI Backend (:8000)
+    participant ReportSvc as ReportLab Engine
+    participant Mem as In-Memory BytesIO Buffer
+
+    User->>FastAPI: GET /api/reports/student/STU1001/pdf
+    FastAPI->>ReportSvc: generate_student_pdf_report(student, db)
+    ReportSvc->>Mem: Instantiate io.BytesIO()
+    ReportSvc->>Mem: Compile SimpleDocTemplate with Tables, Colors & Flowables
+    ReportSvc->>Mem: Seek buffer to offset 0
+    Mem-->>ReportSvc: Return buffer.getvalue() (Raw binary bytes)
+    ReportSvc-->>FastAPI: bytes (starts with %PDF)
+    FastAPI-->>User: 200 OK (Content-Type: application/pdf, Content-Disposition: attachment)
+    Note over User,Mem: Zero temporary files written to server disk
+```

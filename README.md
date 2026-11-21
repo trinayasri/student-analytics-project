@@ -216,20 +216,32 @@ erDiagram
 
 ## ⚡ Quick Start Guide
 
-### 1. Environment Setup
+### 🚀 1-Click Launch (Easiest Method)
+
+Simply double-click:
+* **`run_project.bat`** in this project directory, OR
+* **`Run Student Analytics.bat`** on your Desktop!
+
+This automatically starts both the FastAPI backend and Streamlit dashboard in parallel and opens your browser.
+
+---
+
+### Manual Launch Method
+
+#### 1. Environment Setup
 
 ```powershell
 # Navigate to project directory
-cd C:\Users\Trinayasri\.gemini\antigravity\scratch\student-performance-analytics
+cd "C:\Users\Trinayasri\OneDrive\Desktop\pojects\student analytics project"
 
-# Activate existing virtual environment
+# Activate virtual environment
 .\venv\Scripts\Activate.ps1
 
 # (Optional) Set your Gemini API key in terminal or create .env file
 $env:GEMINI_API_KEY="your-gemini-api-key-here"
 ```
 
-### 2. Database Initialization & Seeding
+#### 2. Database Initialization & Seeding (Pre-seeded)
 
 Reset and seed the SQLite database with 20 diverse synthetic student records and demo user accounts:
 
@@ -237,14 +249,14 @@ Reset and seed the SQLite database with 20 diverse synthetic student records and
 python seed_data.py --reset
 ```
 
-#### Pre-Configured Demo Accounts:
+##### Pre-Configured Demo Accounts:
 | Role | Username | Password | Purpose |
 | :--- | :--- | :--- | :--- |
 | **Admin** | `admin` | `Admin@123` | Global KPIs, Bulk CSV/Excel Ingestion, User Oversight |
 | **Teacher** | `teacher` | `Teacher@123` | Class Progression, 3-Tier Risk Radar, Report Downloads |
 | **Student** | `student` | `Student@123` | Personal Grade Card, Gemini AI Diagnosis, Interactive Study Plan |
 
-### 3. Launch Backend API (Terminal 1)
+#### 3. Launch Backend API (Terminal 1)
 
 ```powershell
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
@@ -253,7 +265,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 - **Interactive ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 - **Health Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 
-### 4. Launch Frontend Dashboard (Terminal 2)
+#### 4. Launch Frontend Dashboard (Terminal 2)
 
 ```powershell
 python -m streamlit run frontend/dashboard.py --server.port 8501
